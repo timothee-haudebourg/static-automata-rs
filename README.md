@@ -1,9 +1,9 @@
 # Static Regular Grammars
 
-[![Build](https://img.shields.io/github/actions/workflow/status/timothee-haudebourg/static-regular-grammar/ci.yml?branch=main&style=flat-square)](https://github.com/timothee-haudebourg/static-regular-grammar/actions)
-[![Crate informations](https://img.shields.io/crates/v/static-regular-grammar.svg?style=flat-square)](https://crates.io/crates/static-regular-grammar)
-[![License](https://img.shields.io/crates/l/static-regular-grammar.svg?style=flat-square)](https://github.com/timothee-haudebourg/static-regular-grammar#license)
-[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square)](https://docs.rs/static-regular-grammar)
+[![Build](https://img.shields.io/github/actions/workflow/status/timothee-haudebourg/static-automata/ci.yml?branch=main&style=flat-square)](https://github.com/timothee-haudebourg/static-automata/actions)
+[![Crate informations](https://img.shields.io/crates/v/static-automata.svg?style=flat-square)](https://crates.io/crates/static-automata)
+[![License](https://img.shields.io/crates/l/static-automata.svg?style=flat-square)](https://github.com/timothee-haudebourg/static-automata#license)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square)](https://docs.rs/static-automata)
 
 <!-- cargo-rdme start -->
 
@@ -28,7 +28,7 @@ specifying the grammar "token string type". This token string type can be:
 ### Example
 
 ```rust
-use static_regular_grammar::RegularGrammar;
+use static_automata::RegularGrammar;
 
 /// Example grammar.
 ///

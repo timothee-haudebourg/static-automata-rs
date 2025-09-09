@@ -1,11 +1,9 @@
 use abnf::types::{Kind, Node, Repeat, TerminalValues};
+use iregex::automata::{RangeSet, DFA, NFA};
+use scc_trait::{Components, Scc};
 use std::collections::HashMap;
 
-use crate::{
-	token::{TokenRange, TokenSet},
-	utils::{automaton::DetAutomaton, scc::Components, Automaton, SccGraph},
-	Token,
-};
+use crate::token::Token;
 
 use super::GrammarError;
 
@@ -53,7 +51,7 @@ pub enum BuiltTerminalValues<T: Token> {
 	// FIXME: Keep base (bin, dec, hex)
 	// Relaxed for Unicode support, see <https://github.com/duesee/abnf/pull/3>.
 	/// A single value within a range (e.g. `%x01-ff`).
-	Range(T::Range),
+	Range(RangeSet<T>),
 	/// A terminal defined by a concatenation of values (e.g. `%x0f.f1.ce`).
 	Concatenation(Vec<T>),
 }
@@ -79,7 +77,7 @@ pub enum BuiltNode<T: Token> {
 	/// An option, e.g. `[A]`.
 	Optional(Box<Self>),
 	/// A literal text string/terminal, e.g. `"http"`, `%i"hTtP"` or `%s"http"`.
-	String(Vec<T::Set>),
+	String(Vec<RangeSet<T>>),
 	/// A single value within a range (e.g. `%x01-ff`)
 	/// or a terminal defined by a series of values (e.g. `%x0f.f1.ce`).
 	TerminalValues(BuiltTerminalValues<T>),
@@ -131,7 +129,7 @@ impl<T: Token> BuiltNode<T> {
 				let mut string = Vec::with_capacity(s.value().len());
 				for c in s.value().chars() {
 					let token = T::from_char(c).ok_or(GrammarError::UnsupportedCharToken(c))?;
-					string.push(T::Set::singleton(token, s.is_case_sensitive()))
+					string.push(T::singleton(token, s.is_case_sensitive()))
 				}
 
 				Ok(Self::String(string))
@@ -141,7 +139,7 @@ impl<T: Token> BuiltNode<T> {
 					TerminalValues::Range(a, b) => {
 						let a = T::from_u32(*a).ok_or(GrammarError::UnsupportedU32Token(*a))?;
 						let b = T::from_u32(*b).ok_or(GrammarError::UnsupportedU32Token(*b))?;
-						BuiltTerminalValues::Range(T::Range::new(a, b))
+						BuiltTerminalValues::Range(T::range(a, b))
 					}
 					TerminalValues::Concatenation(list) => {
 						let mut tokens = Vec::with_capacity(list.len());
@@ -184,7 +182,7 @@ impl<T: Token> BuiltNode<T> {
 			Self::Alternatives(nodes) => nodes.iter().all(|n| n.is_non_recursive(components, c)),
 			Self::Concatenation(nodes) => nodes.iter().all(|n| n.is_non_recursive(components, c)),
 			Self::Group(g) => g.is_non_recursive(components, c),
-			Self::NonTerminal(i) => components.vertex_component(i).unwrap() != c,
+			Self::NonTerminal(i) => components.vertex_component_index(i).unwrap() != c,
 			Self::Optional(n) => n.is_non_recursive(components, c),
 			Self::Repetition { node, .. } => node.is_non_recursive(components, c),
 			_ => true,
@@ -241,18 +239,14 @@ impl DependencyGraph {
 	}
 }
 
-impl SccGraph for DependencyGraph {
+impl Scc for DependencyGraph {
 	type Vertex = usize;
 
-	type Vertices<'a> = std::ops::Range<usize>;
-
-	type Successors<'a> = std::iter::Copied<std::slice::Iter<'a, usize>>;
-
-	fn vertices(&self) -> Self::Vertices<'_> {
+	fn vertices(&self) -> impl '_ + IntoIterator<Item = Self::Vertex> {
 		0..self.nodes.len()
 	}
 
-	fn successors(&self, v: Self::Vertex) -> Self::Successors<'_> {
+	fn successors(&self, v: Self::Vertex) -> impl '_ + IntoIterator<Item = Self::Vertex> {
 		self.nodes[v].iter().copied()
 	}
 }
@@ -260,14 +254,14 @@ impl SccGraph for DependencyGraph {
 struct StateBuilder(u32);
 
 impl StateBuilder {
-	fn next<L>(&mut self, aut: &mut Automaton<u32, L>) -> u32 {
+	fn next<L>(&mut self, aut: &mut NFA<u32, L>) -> u32 {
 		let q = self.0;
 		self.0 += 1;
-		aut.declare_state(q);
+		aut.add_state(q);
 		q
 	}
 
-	fn next_pair<L>(&mut self, aut: &mut Automaton<u32, L>) -> (u32, u32) {
+	fn next_pair<L>(&mut self, aut: &mut NFA<u32, L>) -> (u32, u32) {
 		let a = self.next(aut);
 		let b = self.next(aut);
 		(a, b)
@@ -279,10 +273,6 @@ pub struct Grammar<T: Token> {
 	entry_point: usize,
 	components: Components<usize>,
 }
-
-// fn no_core_rules<'a, T: Token>() -> (Vec<NonTerminal<T>>, HashMap<&'a str, usize>) {
-// 	(Vec::new(), HashMap::new())
-// }
 
 /// Defines the core ABNF rules.
 ///
@@ -361,11 +351,11 @@ fn define_core_rules<'a, T: Token>() -> (Vec<NonTerminal<T>>, HashMap<&'a str, u
 	non_terminals[0]
 		.constructors
 		.push(BuiltNode::Alternatives(vec![
-			BuiltNode::TerminalValues(BuiltTerminalValues::Range(T::Range::new(
+			BuiltNode::TerminalValues(BuiltTerminalValues::Range(T::range(
 				T::from_u8(b'A'),
 				T::from_u8(b'Z'),
 			))),
-			BuiltNode::TerminalValues(BuiltTerminalValues::Range(T::Range::new(
+			BuiltNode::TerminalValues(BuiltTerminalValues::Range(T::range(
 				T::from_u8(b'a'),
 				T::from_u8(b'z'),
 			))),
@@ -375,21 +365,21 @@ fn define_core_rules<'a, T: Token>() -> (Vec<NonTerminal<T>>, HashMap<&'a str, u
 	non_terminals[1]
 		.constructors
 		.push(BuiltNode::TerminalValues(BuiltTerminalValues::Range(
-			T::Range::new(T::from_u8(b'0'), T::from_u8(b'1')),
+			T::range(T::from_u8(b'0'), T::from_u8(b'1')),
 		)));
 
 	// CHAR
 	non_terminals[2]
 		.constructors
 		.push(BuiltNode::TerminalValues(BuiltTerminalValues::Range(
-			T::Range::new(T::from_u8(0x01), T::from_u8(0x7f)),
+			T::range(T::from_u8(0x01), T::from_u8(0x7f)),
 		)));
 
 	// CR
 	non_terminals[3]
 		.constructors
 		.push(BuiltNode::TerminalValues(BuiltTerminalValues::Range(
-			T::Range::from_u8(0x0d),
+			T::singleton(T::from_u8(0x0d), true),
 		)));
 
 	// CRLF
@@ -404,25 +394,28 @@ fn define_core_rules<'a, T: Token>() -> (Vec<NonTerminal<T>>, HashMap<&'a str, u
 	non_terminals[5]
 		.constructors
 		.push(BuiltNode::Alternatives(vec![
-			BuiltNode::TerminalValues(BuiltTerminalValues::Range(T::Range::new(
+			BuiltNode::TerminalValues(BuiltTerminalValues::Range(T::range(
 				T::from_u8(0x00),
 				T::from_u8(0x1f),
 			))),
-			BuiltNode::TerminalValues(BuiltTerminalValues::Range(T::Range::from_u8(0x7f))),
+			BuiltNode::TerminalValues(BuiltTerminalValues::Range(T::singleton(
+				T::from_u8(0x7f),
+				true,
+			))),
 		]));
 
 	// DIGIT
 	non_terminals[6]
 		.constructors
 		.push(BuiltNode::TerminalValues(BuiltTerminalValues::Range(
-			T::Range::new(T::from_u8(b'0'), T::from_u8(b'9')),
+			T::range(T::from_u8(b'0'), T::from_u8(b'9')),
 		)));
 
 	// DQUOTE
 	non_terminals[7]
 		.constructors
 		.push(BuiltNode::TerminalValues(BuiltTerminalValues::Range(
-			T::Range::from_u8(b'"'),
+			T::singleton(T::from_u8(b'"'), true),
 		)));
 
 	// HEXDIG
@@ -430,11 +423,11 @@ fn define_core_rules<'a, T: Token>() -> (Vec<NonTerminal<T>>, HashMap<&'a str, u
 		.constructors
 		.push(BuiltNode::Alternatives(vec![
 			BuiltNode::NonTerminal(6), // DIGIT
-			BuiltNode::TerminalValues(BuiltTerminalValues::Range(T::Range::new(
+			BuiltNode::TerminalValues(BuiltTerminalValues::Range(T::range(
 				T::from_u8(b'A'),
 				T::from_u8(b'F'),
 			))),
-			BuiltNode::TerminalValues(BuiltTerminalValues::Range(T::Range::new(
+			BuiltNode::TerminalValues(BuiltTerminalValues::Range(T::range(
 				T::from_u8(b'a'),
 				T::from_u8(b'f'),
 			))),
@@ -444,14 +437,14 @@ fn define_core_rules<'a, T: Token>() -> (Vec<NonTerminal<T>>, HashMap<&'a str, u
 	non_terminals[9]
 		.constructors
 		.push(BuiltNode::TerminalValues(BuiltTerminalValues::Range(
-			T::Range::from_u8(0x09),
+			T::singleton(T::from_u8(0x09), true),
 		)));
 
 	// LF
 	non_terminals[10]
 		.constructors
 		.push(BuiltNode::TerminalValues(BuiltTerminalValues::Range(
-			T::Range::from_u8(0x0a),
+			T::singleton(T::from_u8(0x0a), true),
 		)));
 
 	// LWSP
@@ -473,21 +466,21 @@ fn define_core_rules<'a, T: Token>() -> (Vec<NonTerminal<T>>, HashMap<&'a str, u
 	non_terminals[12]
 		.constructors
 		.push(BuiltNode::TerminalValues(BuiltTerminalValues::Range(
-			T::Range::new(T::from_u8(0x00), T::from_u8(0xff)),
+			T::range(T::from_u8(0x00), T::from_u8(0xff)),
 		)));
 
 	// SP
 	non_terminals[13]
 		.constructors
 		.push(BuiltNode::TerminalValues(BuiltTerminalValues::Range(
-			T::Range::from_u8(0x20),
+			T::singleton(T::from_u8(0x20), true),
 		)));
 
 	// VCHAR
 	non_terminals[14]
 		.constructors
 		.push(BuiltNode::TerminalValues(BuiltTerminalValues::Range(
-			T::Range::new(T::from_u8(0x21), T::from_u8(0x7e)),
+			T::range(T::from_u8(0x21), T::from_u8(0x7e)),
 		)));
 
 	// WSP
@@ -520,7 +513,7 @@ fn define_core_rules<'a, T: Token>() -> (Vec<NonTerminal<T>>, HashMap<&'a str, u
 }
 
 impl<T: Token> Grammar<T> {
-	pub fn new(data: String, entry_point: Option<&str>) -> Result<Self, GrammarError> {
+	pub fn new(data: &str, entry_point: Option<&str>) -> Result<Self, GrammarError> {
 		let rules = abnf::rulelist(&data).map_err(GrammarError::Abnf)?;
 
 		let (mut non_terminals, mut by_name) = define_core_rules::<T>();
@@ -575,7 +568,7 @@ impl<T: Token> Grammar<T> {
 			components: &Components<usize>,
 			c: usize,
 		) -> bool {
-			let component = components.get(c).unwrap();
+			let component = components.get(&c).unwrap();
 			component
 				.iter()
 				.all(|&i| non_terminals[i].is_left_regular(components, c))
@@ -586,7 +579,7 @@ impl<T: Token> Grammar<T> {
 			components: &Components<usize>,
 			c: usize,
 		) -> bool {
-			let component = components.get(c).unwrap();
+			let component = components.get(&c).unwrap();
 			component
 				.iter()
 				.all(|&i| non_terminals[i].is_right_regular(components, c))
@@ -612,24 +605,20 @@ impl<T: Token> Grammar<T> {
 		})
 	}
 
-	fn build_from(
-		&self,
-		aut: &mut Automaton<u32, T::Set>,
-		states: &mut StateBuilder,
-		i: usize,
-	) -> (u32, u32) {
-		let c = self.components.vertex_component(&i).unwrap();
+	fn build_from(&self, aut: &mut NFA<u32, T>, states: &mut StateBuilder, i: usize) -> (u32, u32) {
+		let c = self.components.vertex_component_index(&i).unwrap();
 		self.build_component_from(aut, states, c, i)
 	}
 
 	fn build_component_from(
 		&self,
-		aut: &mut Automaton<u32, T::Set>,
+		aut: &mut NFA<u32, T>,
 		states: &mut StateBuilder,
 		c: usize,
 		i: usize,
 	) -> (u32, u32) {
-		let component = self.components.get(c).unwrap();
+		let component = self.components.get_by_index(c).unwrap();
+
 		let component_states: HashMap<usize, (u32, u32)> = component
 			.iter()
 			.map(|&i| (i, (states.next(aut), states.next(aut))))
@@ -650,7 +639,7 @@ impl<T: Token> Grammar<T> {
 
 	fn build_node(
 		&self,
-		aut: &mut Automaton<u32, T::Set>,
+		aut: &mut NFA<u32, T>,
 		states: &mut StateBuilder,
 		component_states: &HashMap<usize, (u32, u32)>,
 		node: &BuiltNode<T>,
@@ -693,7 +682,7 @@ impl<T: Token> Grammar<T> {
 				let mut b = a;
 				for token in prose {
 					let c = states.next(aut);
-					aut.add(b, Some(T::Set::singleton(*token, true)), c);
+					aut.add(b, Some(T::singleton(*token, true)), c);
 					b = c;
 				}
 				(a, b)
@@ -719,7 +708,7 @@ impl<T: Token> Grammar<T> {
 			BuiltNode::TerminalValues(values) => match values {
 				BuiltTerminalValues::Range(range) => {
 					let (a, b) = states.next_pair(aut);
-					aut.add(a, Some(T::Set::from_range(*range)), b);
+					aut.add(a, Some(range.clone()), b);
 					(a, b)
 				}
 				BuiltTerminalValues::Concatenation(tokens) => {
@@ -727,7 +716,7 @@ impl<T: Token> Grammar<T> {
 					let mut b = a;
 					for token in tokens {
 						let c = states.next(aut);
-						aut.add(b, Some(T::Set::singleton(*token, true)), c);
+						aut.add(b, Some(T::singleton(*token, true)), c);
 						b = c;
 					}
 					(a, b)
@@ -738,7 +727,7 @@ impl<T: Token> Grammar<T> {
 
 	fn build_repeat(
 		&self,
-		aut: &mut Automaton<u32, T::Set>,
+		aut: &mut NFA<u32, T>,
 		states: &mut StateBuilder,
 		component_states: &HashMap<usize, (u32, u32)>,
 		node: &BuiltNode<T>,
@@ -781,8 +770,8 @@ impl<T: Token> Grammar<T> {
 	}
 
 	/// Builds a non-deterministic automaton from a regular grammar.
-	fn build_nd_automaton(&self) -> Automaton<u32, T::Set> {
-		let mut aut = Automaton::new();
+	fn build_nfa(&self) -> NFA<u32, T> {
+		let mut aut = NFA::new();
 		let mut states = StateBuilder(0);
 		let (a, b) = self.build_from(&mut aut, &mut states, self.entry_point);
 		aut.add_initial_state(a);
@@ -790,34 +779,31 @@ impl<T: Token> Grammar<T> {
 		aut
 	}
 
-	pub fn build_automaton(&self) -> DetAutomaton<u32, T::Set> {
-		let mut count = 0;
-		let nd_aut = self.build_nd_automaton();
-
-		let det_aut = nd_aut.determinize();
-
-		let simple_aut = DetAutomaton::map(
-			&det_aut,
-			|_| {
-				let i = count;
-				count += 1;
-				i
-			},
-			|label: &T::Set| label.clone(),
-		);
-
-		let partition = DetAutomaton::partition(&simple_aut, |q| simple_aut.is_final_state(q));
-		let minimized = simple_aut.minimize(partition.into_values());
+	pub fn build_dfa(&self) -> DFA<u32, RangeSet<T>> {
+		let nd_aut = self.build_nfa();
 
 		let mut count = 0;
-		DetAutomaton::map(
+		let det_aut = nd_aut.determinize(|_| {
+			let i = count;
+			count += 1;
+			i
+		});
+
+		let partition = DFA::partition(&det_aut, |q| det_aut.is_final_state(q));
+		let minimized = det_aut.minimize(partition.into_values());
+
+		let mut count = 0;
+		let mut simplified = DFA::map(
 			&minimized,
 			|_| {
 				let i = count;
 				count += 1;
 				i
 			},
-			|label: &T::Set| label.clone(),
-		)
+			|&label| label.clone(),
+		);
+
+		simplified.unify_labels();
+		simplified
 	}
 }
