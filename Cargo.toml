@@ -17,7 +17,8 @@ rust-version = "1.85.0"
 version = "1.0.0"
 
 [workspace.dependencies]
-build-automata = { path = "build" }
+build-automata = { path = "build", version = "1.0.0" }
+static-automata-macros = { path = "macros", version = "1.0.0" }
 syn = "2.0.18"
 quote = "1.0.29"
 proc-macro2 = "1.0.60"
@@ -37,4 +38,4 @@ readme.workspace = true
 version.workspace = true
 
 [dependencies]
-static-automata-macros = { path = "macros" }
+static-automata-macros.workspace = true
