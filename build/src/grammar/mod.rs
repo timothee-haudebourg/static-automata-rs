@@ -47,26 +47,8 @@ pub enum GrammarType {
 	Abnf,
 }
 
-impl GrammarType {
-	pub fn new(name: &str) -> Option<Self> {
-		match name {
-			"abnf" => Some(Self::Abnf),
-			_ => None,
-		}
-	}
-}
-
 pub enum Grammar<T: Token> {
 	Abnf(abnf::Grammar<T>),
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum FileError {
-	#[error(transparent)]
-	IO(#[from] std::io::Error),
-
-	#[error(transparent)]
-	Var(#[from] std::env::VarError),
 }
 
 impl<T: Token> Grammar<T> {
