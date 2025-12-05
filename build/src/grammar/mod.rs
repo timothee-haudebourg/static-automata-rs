@@ -1,5 +1,5 @@
 use crate::token::Token;
-use iregex::automata::{RangeSet, DFA};
+use iregex::automata::{DFA, RangeSet};
 
 pub mod abnf;
 

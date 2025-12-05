@@ -1,5 +1,5 @@
 [package]
-name = "cargo-static-automata"
+name = "cargo-build-automata"
 description = "Command line interface to build static regular grammars"
 edition.workspace = true
 authors.workspace = true
@@ -12,4 +12,5 @@ readme.workspace = true
 version.workspace = true
 
 [dependencies]
-static-automata-builder.workspace = true
+build-automata.workspace = true
+clap = { version = "4.5", features = ["derive"] }

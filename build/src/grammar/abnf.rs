@@ -1,5 +1,8 @@
 use abnf::types::{Kind, Node, Repeat, TerminalValues};
-use iregex::automata::{RangeSet, DFA, NFA};
+use iregex::automata::{
+	DFA, NFA, RangeSet,
+	util::{memoize_by_hash, memoize_ref_by_hash},
+};
 use scc_trait::{Components, Scc};
 use std::collections::HashMap;
 
@@ -783,27 +786,27 @@ impl<T: Token> Grammar<T> {
 		let nd_aut = self.build_nfa();
 
 		let mut count = 0;
-		let det_aut = nd_aut.determinize(|_| {
+		let det_aut = nd_aut.determinize(memoize_ref_by_hash(|_| {
 			let i = count;
 			count += 1;
 			i
-		});
+		}));
 
 		let partition = DFA::partition(&det_aut, |q| det_aut.is_final_state(q));
 		let minimized = det_aut.minimize(partition.into_values());
 
 		let mut count = 0;
 		let mut simplified = DFA::map(
-			&minimized,
-			|_| {
+			minimized,
+			memoize_by_hash(|_| {
 				let i = count;
 				count += 1;
 				i
-			},
-			|&label| label.clone(),
+			}),
+			|label| label.clone(),
 		);
 
-		simplified.unify_labels();
+		simplified.merge_labels();
 		simplified
 	}
 }
