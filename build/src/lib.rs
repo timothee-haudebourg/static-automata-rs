@@ -401,7 +401,7 @@ fn generate_automaton_methods<T: Token>(automaton: &DFA<u32, RangeSet<T>>) -> To
 		pub const fn push(&mut self, token: #token_type) -> bool {
 			self.state = match self.state {
 				#(#states,)*
-				_ => unreachable!()
+				_ => return false
 			};
 
 			true
