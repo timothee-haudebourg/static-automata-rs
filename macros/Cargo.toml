@@ -19,4 +19,4 @@ proc-macro2.workspace = true
 syn = { workspace = true, features = ["full"] }
 quote.workspace = true
 thiserror.workspace = true
-proc-macro-error = "1.0.4"
+proc-macro-error = "1.0"
