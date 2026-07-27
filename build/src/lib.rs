@@ -85,7 +85,7 @@ pub fn try_build_automata_with(options: &Options) -> Result<(), Error> {
 	let package = metadata.root_package().ok_or(Error::NoRootPackage)?;
 
 	for target in &package.targets {
-		scan_target(&options, target)?;
+		scan_target(options, target)?;
 	}
 
 	Ok(())
@@ -434,7 +434,7 @@ impl ModuleAttributes {
 						continue;
 					};
 
-					let lit: syn::Lit = e.lit.clone().into();
+					let lit: syn::Lit = e.lit.clone();
 					let syn::Lit::Str(lit) = lit else {
 						continue;
 					};

@@ -517,7 +517,7 @@ fn define_core_rules<'a, T: Token>() -> (Vec<NonTerminal<T>>, HashMap<&'a str, u
 
 impl<T: Token> Grammar<T> {
 	pub fn new(data: &str, entry_point: Option<&str>) -> Result<Self, GrammarError> {
-		let rules = abnf::rulelist(&data).map_err(GrammarError::Abnf)?;
+		let rules = abnf::rulelist(data).map_err(GrammarError::Abnf)?;
 
 		let (mut non_terminals, mut by_name) = define_core_rules::<T>();
 		// let (mut non_terminals, mut by_name) = no_core_rules::<T>();
