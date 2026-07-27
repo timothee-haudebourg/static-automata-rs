@@ -2932,7 +2932,7 @@ impl Iri {
 				'@' => 21u32,
 				_ => return false,
 			},
-			_ => unreachable!(),
+			_ => return false,
 		};
 		true
 	}
