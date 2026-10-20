@@ -91,7 +91,7 @@
 //!   build_automata();
 //! }
 //! ```
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 use core::fmt;
 pub use static_automata_macros::{Validate, grammar};
 
