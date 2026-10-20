@@ -1,6 +1,6 @@
 # Static Automata: Compile-time DFA generation framework.
 
-[![Build](https://img.shields.io/github/actions/workflow/status/timothee-haudebourg/static-automata/ci.yml?branch=main&style=flat-square)](https://github.com/timothee-haudebourg/static-automata-rs/actions)
+[![Build](https://img.shields.io/github/actions/workflow/status/timothee-haudebourg/static-automata-rs/ci.yml?branch=main&style=flat-square)](https://github.com/timothee-haudebourg/static-automata-rs/actions)
 [![Crate informations](https://img.shields.io/crates/v/static-automata.svg?style=flat-square)](https://crates.io/crates/static-automata)
 [![License](https://img.shields.io/crates/l/static-automata.svg?style=flat-square)](https://github.com/timothee-haudebourg/static-automata-rs#license)
 [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square)](https://docs.rs/static-automata)
