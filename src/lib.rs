@@ -91,6 +91,7 @@
 //!   build_automata();
 //! }
 //! ```
+#![no_std]
 use core::fmt;
 pub use static_automata_macros::{Validate, grammar};
 
@@ -99,7 +100,7 @@ pub use static_automata_macros::{Validate, grammar};
 pub struct Utf8Error;
 
 impl fmt::Display for Utf8Error {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		write!(f, "Invalid UTF-8")
 	}
 }
